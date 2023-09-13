@@ -151,6 +151,48 @@ def createObject (objName, fileName, pathName, baseName, extension, objType, smo
     obj["DsphEndFrame"] = endFrame
 
 
+## Class that handles the timesteps for variable "TimeOut" simulation.
+## The class contains two fields (nstep, tout) the first is the number of the first part file
+## that the timestep applies. E.g. if `nsteps` is 100 then Part_0100.bi4 and Part_0101.bi4
+## time difference is `tout`.
+class TimeOut:
+    __slots__ = ["nstep", "tout"]
+    nstep: int                          #< The number of the first file that the timestep applies.
+    tout: float                         #< The value of the timestep.
+
+    def __init__(self, nstep, tout):
+        self.nstep = nstep
+        self.tout = tout
+    
+
+## Parse the timesteps from the XML ElementTree
+## Returns a list of `TimeOut` objects. If the variable TimeOut is not used
+## the list has one element. The first element's `nstep` field is always 0.
+def parseTimeSteps(context):
+    fpath = bpy.path.abspath(context.scene.DsphFoamXML)
+    tree = ET.parse(fpath)
+    root = tree.getroot()
+
+    timeout_elem = root.find("./execution/special/timeout")
+    if not timeout_elem:
+        tout = float(root.find("./execution/parameters/parameter[@key='TimeOut']").get("value"))
+        return [TimeOut(nstep=0, tout=tout)]
+    
+    touts = [
+        (float(tout_elem.get("time")), float(tout_elem.get("timeout")))
+        for tout_elem in timeout_elem
+    ]
+    tsteps = [TimeOut(nstep=0, tout=touts[0][1])]
+    for i in range(1, len(touts)):
+        time_curr = touts[i][0]
+        tout_prev = touts[i - 1][1]
+        sum_iter = ((tsteps[j].nstep-tsteps[j-1].nstep) * touts[j-1][1] for j in range(1, i))
+        n = math.ceil((time_curr - sum(sum_iter)) / tout_prev) + tsteps[-1].nstep
+        tsteps.append(TimeOut(nstep=n, tout=touts[i][1]))
+
+    return tsteps
+
+
 ## Parse DualSPHysics XML configuration
 def parseXML(context):
     fpath = bpy.path.abspath(context.scene.DsphFoamXML)
@@ -162,7 +204,7 @@ def parseXML(context):
             
             bpy.context.scene.DsphFoamH = float(root.find("./execution/constants/h").get("value"))
             context.scene.DsphFoamMass = float(root.find("./execution/constants/massfluid").get("value"))
-            context.scene.DsphFoamTimeStep = float(root.find("./execution/parameters/parameter[@key='TimeOut']").get("value"))
+            # context.scene.DsphFoamTimeStep = float(root.find("./execution/parameters/parameter[@key='TimeOut']").get("value"))
                     
             if not context.scene.DsphFoamCustomDomain:
                 #Get domain from xml file
@@ -456,7 +498,7 @@ class OBJECT_OT_RunFoamSimulation(bpy.types.Operator):
                     False,                                              # Output vtk fluid info files
                     context.scene.DsphFoamH,                            # H value
                     context.scene.DsphFoamMass,                         # Fluid particle mass value
-                    context.scene.DsphFoamTimeStep,                     # Timestep duration
+                    # context.scene.DsphFoamTimeStep,                     # Timestep duration
                     context.scene.DsphFoamMinX,                         # Domain limits
                     context.scene.DsphFoamMinY,
                     context.scene.DsphFoamMinZ,
@@ -475,7 +517,9 @@ class OBJECT_OT_RunFoamSimulation(bpy.types.Operator):
                     context.scene.DsphFoamBubblesDensity,
                     context.scene.DsphFoamLifetime,
                     context.scene.DsphFoamBuoyancy,
-                    context.scene.DsphFoamDrag)
+                    context.scene.DsphFoamDrag,
+                    parseTimeSteps(context),                                   # Timesteps duration
+                    )
                     
                 fileName = context.scene.DsphFoamPrefix + str(context.scene.DsphFoamStart).zfill(4) + ".vtk"
 
@@ -626,7 +670,7 @@ class PROPERTIES_PT_FoamSimulationPanel(bpy.types.Panel):
     # Hidden properties
     bpy.types.Scene.DsphFoamH = bpy.props.FloatProperty(name = "H")
     bpy.types.Scene.DsphFoamMass = bpy.props.FloatProperty(name = "Mass")
-    bpy.types.Scene.DsphFoamTimeStep = bpy.props.FloatProperty(name = "TimeStep")
+    # bpy.types.Scene.DsphFoamTimeStep = bpy.props.FloatProperty(name = "TimeStep")
 
     
     @classmethod

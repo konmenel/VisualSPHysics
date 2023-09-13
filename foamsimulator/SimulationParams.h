@@ -20,6 +20,14 @@
 #include <string>
 
 /**
+   \brief Struct that handles the timesteps for variable "TimeOut" simulation.
+ */
+struct TimeOut {
+  int nstep;                            ///< The number of the first file that the timestep applies (e.g. nstep=100 => Part_0100.vtk).
+  double tout;                          ///< The value of the timestep.
+};
+
+/**
    \brief Parámetros para iniciar una simulación.
  */
 struct SimulationParams {
@@ -40,7 +48,7 @@ struct SimulationParams {
 
   double h,				                      ///< H value in meters.
     mass,                               ///< Mass of each fluid particle in Kg.
-    TIMESTEP,                           ///< Time step in seconds.
+    // TIMESTEP,                           ///< Time step in seconds.
 
     MINX,                               ///< Domain limits. Minimum in the axis x.
     MINY,                               ///< Domain limits. Minimum in the axis y.
@@ -65,6 +73,8 @@ struct SimulationParams {
     LIFEFIME, 				                  ///< Life time of diffuse particles.
     KB, 				                        ///< Buoyancy factor for bubble particles.
     KD; 				                        ///< Drag factor for buoyancy particles.
-};
 
+    size_t ntimesteps;                  ///< The size of the timesteps array.
+    TimeOut *timesteps;                 ///< The timesteps array in seconds.
+};
 #endif

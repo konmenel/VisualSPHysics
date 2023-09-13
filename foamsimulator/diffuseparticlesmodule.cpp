@@ -16,6 +16,8 @@
 
 #include <Python.h>
 #include <iostream>
+#include <vector>
+#include <stdlib.h>
 #include "SimulationParams.h"
 #include "DiffuseCalculator.h"
 
@@ -29,8 +31,12 @@ extern "C"
   static PyObject * diffuseparticles_run(PyObject *self, PyObject *args){
     const char * dataPath, * filePrefix, * outputPath, * outputPreffix, * exclusionZoneFile;
     SimulationParams sp;
+    PyObject *touts_list;
+    int touts_length;
+    TimeOut *touts;
 
-    if(!PyArg_ParseTuple(args, "sssssiiippppdddddddddddddddddddddd",
+
+    if(!PyArg_ParseTuple(args, "sssssiiippppdddddddddddddddddddddO",
 			 &dataPath,
 			 &filePrefix,
 			 &outputPath,
@@ -43,11 +49,12 @@ extern "C"
 			 &sp.vtk_files,
 			 &sp.vtk_diffuse_data,
 			 &sp.vtk_fluid_data,
-			 &sp.h, &sp.mass, &sp.TIMESTEP,
+			 &sp.h, &sp.mass,// &sp.TIMESTEP,
 			 &sp.MINX, &sp.MINY, &sp.MINZ, &sp.MAXX, &sp.MAXY, &sp.MAXZ,
 			 &sp.MINTA, &sp.MAXTA, &sp.MINWC, &sp.MAXWC,
 			 &sp.MINK, &sp.MAXK, &sp.KTA, &sp.KWC,
-			 &sp.SPRAY, &sp.BUBBLES, &sp.LIFEFIME, &sp.KB, &sp.KD
+			 &sp.SPRAY, &sp.BUBBLES, &sp.LIFEFIME, &sp.KB, &sp.KD,
+       &touts_list
 			 )){
       return NULL;
     }
@@ -58,10 +65,40 @@ extern "C"
     sp.outputPath = outputPath;
     sp.outputPreffix = outputPreffix;
     sp.exclusionZoneFile = exclusionZoneFile;
+
+    touts_length = PyObject_Length(touts_list);
+    if (touts_length < 0)
+      return NULL;
+
+    touts = (TimeOut *) malloc(sizeof(TimeOut) * touts_length);
+    if (touts == NULL)
+      return NULL;
+
+    for (int i = 0; i < touts_length; i++) {
+        PyObject *tout_obj;
+        tout_obj = PyList_GetItem(touts_list, i);
+
+        PyObject *nstep;
+        PyObject *tout;
+
+        nstep = PyObject_GetAttrString(tout_obj, "nstep");
+        tout = PyObject_GetAttrString(tout_obj, "tout");
+
+        if (!PyLong_Check(nstep))
+            return NULL;
+        if (!PyFloat_Check(tout))
+            return NULL;
+
+        touts[i] = {.nstep=(int)PyLong_AsLong(nstep), .tout=PyFloat_AsDouble(tout)};
+    }
+
+    sp.timesteps = touts;
+    sp.ntimesteps = touts_length;
       
     DiffuseCalculator dc(sp);
     dc.runSimulation();
     
+    free(touts);
     return Py_True;
   }
 

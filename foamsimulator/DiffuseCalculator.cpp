@@ -177,8 +177,15 @@ void DiffuseCalculator::runSimulation() {
   std::vector<int> ppIds, ppTTL;
   std::vector<double> ppDensity;
 
+  size_t tstep_idx = 0;
+  TimeOut timeout;
   // Let's loop!
   for (int nstep = sp.nstart; nstep <= sp.nend; nstep++) {
+    if (tstep_idx+1 < sp.ntimesteps && nstep > (sp.timesteps[tstep_idx+1]).nstep) {
+      tstep_idx++;
+    }
+
+    timeout = sp.timesteps[tstep_idx];
 
     std::sprintf(&seqnum[0], formats.c_str(), nstep);
     std::string fileName = (fs::path(sp.dataPath) / (sp.filePrefix + seqnum + ".vtk")).generic_string();
@@ -208,6 +215,7 @@ void DiffuseCalculator::runSimulation() {
     std::vector<std::array<double, 3>> gradient(npoints, std::array<double, 3>{{0, 0, 0}});
 
     std::cout << "Total fluid particles: " << npoints << std::endl;
+    std::cout << "Current timestep: " << timeout.tout << std::endl;
 
     std::cerr << "\n[Stage 1] trapped air potential, energy and colorfield..." << std::endl;
 
@@ -388,7 +396,7 @@ void DiffuseCalculator::runSimulation() {
 #endif
     for (long i = 0; i < npoints; i++) {
       ndiffuse[i] = std::floor(
-          energy[i] * (sp.KTA * Ita[i] + sp.KWC * waveCrest[i]) * sp.TIMESTEP);
+          energy[i] * (sp.KTA * Ita[i] + sp.KWC * waveCrest[i]) * timeout.tout);
       npdiffuse += ndiffuse[i];
     }
 
@@ -458,7 +466,7 @@ void DiffuseCalculator::runSimulation() {
 
             for (int j = 0; j < ndiffuse[i]; j++) {
               double h = tempRand[idif * 3] *
-                         (ops::magnitude(std::array<double, 3>{{vel[0], vel[1], vel[2]}}) * sp.TIMESTEP) *
+                         (ops::magnitude(std::array<double, 3>{{vel[0], vel[1], vel[2]}}) * timeout.tout) *
 												 .5,
                      r = sp.h * sqrt(tempRand[idif * 3 + 1]), theta = tempRand[idif * 3 + 2] * 2 * M_PI;
 
@@ -544,27 +552,27 @@ void DiffuseCalculator::runSimulation() {
       // Now we can re-clasify and calculate new positions
       if (ppDensity[i] < sp.SPRAY) { // It's spray!
         // TODO: we are avoiding external forces (like wind)
-        ppVel[i] = {{ppVel[i][0], ppVel[i][1], ppVel[i][2] + -9.81 * sp.TIMESTEP}};
-        pxd = {{pxd[0] + sp.TIMESTEP * ppVel[i][0],
-                pxd[1] + sp.TIMESTEP * ppVel[i][1],
-                pxd[2] + sp.TIMESTEP * ppVel[i][2]}};
+        ppVel[i] = {{ppVel[i][0], ppVel[i][1], ppVel[i][2] + -9.81 * timeout.tout}};
+        pxd = {{pxd[0] + timeout.tout * ppVel[i][0],
+                pxd[1] + timeout.tout * ppVel[i][1],
+                pxd[2] + timeout.tout * ppVel[i][2]}};
 
       } else if (ppDensity[i] > sp.BUBBLES) { // It's a bubble!
         num = {{num[0] / den, num[1] / den, num[2] / den}};
-        ppVel[i] = {{ppVel[i][0] + sp.TIMESTEP * (sp.KD * (num[0] - ppVel[i][0]) / sp.TIMESTEP),
-		    						 ppVel[i][1] + sp.TIMESTEP * (sp.KD * (num[1] - ppVel[i][1]) / sp.TIMESTEP),
-		     						 ppVel[i][2] + sp.TIMESTEP * (-sp.KB * -9.81 + sp.KD * (num[2] - ppVel[i][2]) / sp.TIMESTEP)}};
-        pxd = {{pxd[0] + sp.TIMESTEP * ppVel[i][0],
-                pxd[1] + sp.TIMESTEP * ppVel[i][1],
-                pxd[2] + sp.TIMESTEP * ppVel[i][2]}};
+        ppVel[i] = {{ppVel[i][0] + timeout.tout * (sp.KD * (num[0] - ppVel[i][0]) / timeout.tout),
+		    						 ppVel[i][1] + timeout.tout * (sp.KD * (num[1] - ppVel[i][1]) / timeout.tout),
+		     						 ppVel[i][2] + timeout.tout * (-sp.KB * -9.81 + sp.KD * (num[2] - ppVel[i][2]) / timeout.tout)}};
+        pxd = {{pxd[0] + timeout.tout * ppVel[i][0],
+                pxd[1] + timeout.tout * ppVel[i][1],
+                pxd[2] + timeout.tout * ppVel[i][2]}};
 
       } else { // It's foam!
         num = {{num[0] / den, num[1] / den, num[2] / den}};
         ppVel[i] = {{num[0], num[1], num[2]}};
 	
-        pxd = {{pxd[0] + sp.TIMESTEP * num[0],
-								pxd[1] + sp.TIMESTEP * num[1],
-                pxd[2] + sp.TIMESTEP * num[2]}};
+        pxd = {{pxd[0] + timeout.tout * num[0],
+								pxd[1] + timeout.tout * num[1],
+                pxd[2] + timeout.tout * num[2]}};
       }
     }
 
