@@ -178,14 +178,13 @@ void DiffuseCalculator::runSimulation() {
   std::vector<double> ppDensity;
 
   size_t tstep_idx = 0;
-  TimeOut timeout;
+  TimeOut timeout = sp.timesteps[tstep_idx];
   // Let's loop!
   for (int nstep = sp.nstart; nstep <= sp.nend; nstep++) {
     if (tstep_idx+1 < sp.ntimesteps && nstep > (sp.timesteps[tstep_idx+1]).nstep) {
-      tstep_idx++;
+      timeout = sp.timesteps[++tstep_idx];
     }
 
-    timeout = sp.timesteps[tstep_idx];
 
     std::sprintf(&seqnum[0], formats.c_str(), nstep);
     std::string fileName = (fs::path(sp.dataPath) / (sp.filePrefix + seqnum + ".vtk")).generic_string();
