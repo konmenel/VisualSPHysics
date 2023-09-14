@@ -862,8 +862,8 @@ def DsphHandler (scene):
 
             # Smooth shading
             if do["DsphSmooth"]:
-                for poly in newMesh.polygons:
-                    poly.use_smooth = (do["DsphSmooth"] == True)
+                poly_len = len(newMesh.polygons)
+                newMesh.polygons.foreach_set("use_smooth", [True] * poly_len)
                 newMesh.update(calc_edges=False)
 
             if do["DsphValidate"]:    
@@ -873,7 +873,7 @@ def DsphHandler (scene):
             do.data=newMesh
 
             # Motion blur code
-            if do["DsphBlur"]:                    
+            if do["DsphBlur"]:
                 if do["DsphObjType"] == "FLUID" or do["DsphObjType"] == "FOAM":
                     do.shape_key_add(name="Base",from_mix=False) 
                     bm = bmesh.new()
